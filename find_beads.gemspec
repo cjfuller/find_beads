@@ -1,4 +1,3 @@
-
 require 'lib/find_beads/version'
 
 Gem::Specification.new do |g|

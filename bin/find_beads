@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 #--
 # /* ***** BEGIN LICENSE BLOCK *****
 #  * 
@@ -24,9 +25,11 @@
 #  * ***** END LICENSE BLOCK ***** */
 #++
 
-module FindBeads
+require 'find_beads'
 
-  VERSION = '0.9.0'
+if __FILE__ == $0 then
+
+   FindBeads.run_find_beads
 
 end
 

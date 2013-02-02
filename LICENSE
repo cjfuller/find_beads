@@ -23,11 +23,3 @@
 #  * 
 #  * ***** END LICENSE BLOCK ***** */
 #++
-
-module FindBeads
-
-  VERSION = '0.9.0'
-
-end
-
-
