@@ -18,7 +18,7 @@ find_beads [args]
 
 #Documentation
 
-
+API documentation is available [here](http://rubydoc.info/gems/find_beads).
 
 #License
 
