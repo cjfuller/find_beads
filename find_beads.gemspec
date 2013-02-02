@@ -2,7 +2,7 @@ require 'lib/find_beads/version'
 
 Gem::Specification.new do |g|
 
-  g.name = "find beads"
+  g.name = "find_beads"
   g.version = FindBeads::VERSION
   g.date = '2013-02-02'
   g.summary = "Segments and quantifies beads in microscopy images"  
