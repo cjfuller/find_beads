@@ -27,10 +27,7 @@
 
 require 'find_beads'
 
-if __FILE__ == $0 then
+FindBeads.run_find_beads
 
-   FindBeads.run_find_beads
-
-end
 
 
