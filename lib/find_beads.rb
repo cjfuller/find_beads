@@ -30,16 +30,15 @@ require 'rimageanalysistools/image_shortcuts'
 require 'rimageanalysistools/create_parameters'
 require 'rimageanalysistools/graythresh'
 
-require 'edu/stanford/cfuller/imageanalysistools/resources/common_methods'
-
 require 'trollop'
+
+java_import Java::edu.stanford.cfuller.imageanalysistools.image.ImageFactory
 
 ##
 # Functions for segmenting and quantifying beads.
 #
 module FindBeads
 
-  include IATScripting
 
   java_import Java::edu.stanford.cfuller.imageanalysistools.image.ImageCoordinate
   java_import Java::edu.stanford.cfuller.imageanalysistools.image.ImageSet
@@ -292,7 +291,7 @@ module FindBeads
 
     p = RImageAnalysisTools.create_parameter_dictionary(min_size: min_size, max_size: max_size)
 
-    im_cp = writable_image_copy(to_seg)
+    im_cp = ImageFactory.create_writable(to_seg)
 
     mstf = MaximumSeparabilityThresholdingFilter.new
 
@@ -322,7 +321,7 @@ module FindBeads
 
     cens = centroids(to_seg)
 
-    final_mask = writable_image_copy(to_seg)
+    final_mask = ImageFactory.create_writable(to_seg)
 
     radius = rad
 
