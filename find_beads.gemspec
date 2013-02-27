@@ -1,4 +1,4 @@
-require 'find_beads/version'
+require_relative 'lib/find_beads/version'
 
 Gem::Specification.new do |g|
 
