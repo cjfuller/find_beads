@@ -124,11 +124,17 @@ module FindBeads
 
         closest_index = i
 
+      elsif dist < next_dist then
+
+        next_dist = dist
+
+        next_index = i
+
       end
 
     end
 
-    cutoff = 2*Math.sqrt(2)
+    cutoff = 1.01*Math.sqrt(2)
 
     if next_dist - closest_dist < cutoff then
 
