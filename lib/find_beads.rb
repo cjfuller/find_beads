@@ -32,6 +32,8 @@ require 'rimageanalysistools/graythresh'
 
 require 'trollop'
 
+require 'matrix'
+
 java_import Java::edu.stanford.cfuller.imageanalysistools.image.ImageFactory
 
 ##
@@ -89,6 +91,35 @@ module FindBeads
 
   end
 
+
+  ##
+  # Projects a point in space onto a specified line.
+  #
+  # @param [Array] origin the point in space the will serve as the origin 
+  #  for the purposes of the projection (this should be on the line)
+  # @param [Array] point_to_project the point in space that will be projected
+  #  this should be in the same coordinate system in which the origin is
+  #  specified, not relative to the origin
+  # @param [Array] point_on_line another point on the line specified in the
+  #  same coordinate system in which the origin is specified, not relative to
+  #  the origin
+  #
+  # @return [Array] the projected point (in the same coordinate system as
+  #  the other points were specified)
+  #
+  def self.project_point_onto_vector(origin, point_to_project, point_on_line)
+
+    unit_vec = (Vector[*point_on_line] - Vector[*origin]).normalize
+
+    proj_vec = Vector[*point_to_project] - Vector[*origin]
+
+    projected = unit_vec * (proj_vec.inner_product(unit_vec)) + Vector[*origin]
+
+    projected.to_a
+
+  end
+
+
   ##
   # Checks if a given coordinate would be approximately on the boundary between two regions of a 
   # Voronoi diagram of constructed from a set of points.  The approximation is calculated such that no
@@ -134,9 +165,15 @@ module FindBeads
 
     end
 
+    proj_point = project_point_onto_vector(points[closest_index], [x,y], points[next_index])
+
+    next_dist_proj = Math.hypot(points[next_index][0]-proj_point[0], points[next_index][1]-proj_point[1])
+    closest_dist_proj = Math.hypot(points[closest_index][0]-proj_point[0], points[closest_index][1]-proj_point[1])
+
+
     cutoff = 1.01*Math.sqrt(2)
 
-    if next_dist - closest_dist < cutoff then
+    if next_dist_proj - closest_dist_proj < cutoff then
 
       true
 
