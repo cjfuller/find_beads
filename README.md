@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/cjfuller/find_beads.png)](https://travis-ci.org/cjfuller/find_beads)
+
 #Introduction
 
 Script to segment and quantify beads in microscopy images.
