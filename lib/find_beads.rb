@@ -502,7 +502,7 @@ module FindBeads
       opt :file, "File to process", :type => :string
       opt :segchannel, "Channel on which to segment (0-indexed)", :type => :integer, :default => DEFAULT_SEG_CH
       opt :segplane, "Plane on which to segment (0-indexed)", :type => :integer, :default => DEFAULT_SEG_PL
-      opt :max_threads, "Maximum number of paralell execution threads", :type => :integer, :default => DEFAULT_THREADS
+      opt :max_threads, "Maximum number of parallel execution threads", :type => :integer, :default => DEFAULT_THREADS
       opt :beadradius, "Radius of the bead in pixels", :type => :float, :default => DEFAULT_BEAD_RADIUS
 
     end
