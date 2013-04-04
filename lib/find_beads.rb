@@ -56,6 +56,7 @@ module FindBeads
   DEFAULT_SEG_CH = 2
   DEFAULT_SEG_PL = 8
   DEFAULT_BEAD_RADIUS = 24.0
+  DEFAULT_THREADS = 1
 
   ##
   # Finds the centroid of each unique-greylevel region in a mask.
@@ -501,6 +502,7 @@ module FindBeads
       opt :file, "File to process", :type => :string
       opt :segchannel, "Channel on which to segment (0-indexed)", :type => :integer, :default => DEFAULT_SEG_CH
       opt :segplane, "Plane on which to segment (0-indexed)", :type => :integer, :default => DEFAULT_SEG_PL
+      opt :max_threads, "Maximum number of paralell execution threads", :type => :integer, :default => DEFAULT_THREADS
       opt :beadradius, "Radius of the bead in pixels", :type => :float, :default => DEFAULT_BEAD_RADIUS
 
     end
@@ -509,7 +511,14 @@ module FindBeads
 
       fod = opts[:dir]
 
+      sleep_time_s = 0.5
+      threads = []
+
       Dir.foreach(fod) do |f|
+
+        until threads.count { |t| t.alive? } < opts[:max_threads] do
+          sleep sleep_time_s
+        end
 
         fn = File.expand_path(f, fod)
 
@@ -517,7 +526,11 @@ module FindBeads
 
           begin
 
-            process_file(fn, opts)
+            threads << Thread.new do 
+
+              process_file(fn, opts)
+
+            end
 
           rescue Exception => e
 
@@ -530,7 +543,11 @@ module FindBeads
 
       end
 
+      threads.each { |t| t.join }
+
     end
+
+
 
     if opts[:file] then
 
