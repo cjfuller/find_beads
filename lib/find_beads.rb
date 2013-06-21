@@ -31,6 +31,8 @@ require 'rimageanalysistools/create_parameters'
 require 'rimageanalysistools/graythresh'
 require 'trollop'
 require 'matrix'
+require 'ostruct'
+require 'csv'
 
 ##
 # Functions for segmenting and quantifying beads.
@@ -226,8 +228,11 @@ module FindBeads
   #
   # @param [Image] im the image to segment
   # @param [Hash] opts a hash of commandline arguments.
+  # @param [OpenStruct, #centroids=] centroid_storage an optional object
+  #   to which the bead centroids will be fed using #centroids=
+  #   default=nil, causes them not to be set
   #
-  def self.mask_from_image(im, opts)
+  def self.mask_from_image(im, opts, centroid_storage = nil)
     seg_ch = nil
     seg_pl = nil
     rad = nil
@@ -307,9 +312,129 @@ module FindBeads
     saf.apply(final_mask)
     lf.apply(final_mask)
 
+    remapped_cens = {}
+    cen_coord = ImageCoordinate[0,0,0,0,0]
+
+    cens.each do |k, cen|
+      cen_coord[:x] = cen[0]
+      cen_coord[:y] = cen[1]
+      val = final_mask[cen_coord]
+      
+      if val > 0 then
+        remapped_cens[val] = cen
+      end
+    end
+
+    cen_coord.recycle
+
+    if centroid_storage then
+      centroid_storage.centroids= remapped_cens
+    end
+
     final_mask
 
   end
+
+  ##
+  # Swaps the x and y coordinates of an ImageCoordinate in place relative to a supplied origin.
+  #
+  # @param [ImageCoordinate] coord the coordinate whose components will be swapped.
+  # @param [Numeric] cen_x the x-coordinate of the origin relative to which the swap will be calculated
+  # @param [Numeric] cen_y the y-coordinate of the origin relative to which the swap will be calculated
+  #
+  # @return [ImageCoordinate] coord
+  #
+  def self.mirror_coord!(coord, cen_x, cen_y)
+    rel_x = coord[:x] - cen_x
+    rel_y = coord[:y] - cen_y
+    coord[:x] = (rel_y + cen_x).round.to_i
+    coord[:y] = (rel_x + cen_y).round.to_i
+    coord
+  end
+
+  ##
+  # Computes the two-channel correlation for a single bead.  
+  #
+  # @param [Image] mask the mask of labeled, segmented beads
+  # @param [Image] im the image of the beads (single z-section, multiple channels)
+  # @param [Integer] ch0 the (0-based) index of the first channel of the correlation
+  # @param [Integer] ch1 the (0-based) index of the second channel of the correlation
+  # @param [Array] cen an array containing the x,y coordinates of the centroid of the current bead
+  # @param [Integer] id the label of the current bead in the mask
+  # @param [Numeric] bead_radius the radius of a bead
+  # @param [Boolean] do_normalization whether to normalize to the geometric mean of the autocorrelations of the two channels
+  #
+  # @return [Hash] a hash containing components :norm_corr (the background-subtracted, normalized correlation), :corr (the
+  #                non-normalized, non-subtracted two-channel correlation), and :bg_corr (the non-normalized background 
+  #                two-channel correlation, calculated by rotating one channel of the bead 90 degrees around the bead centroid)
+  #
+  def self.compute_single_bead_correlation(mask, im, ch0, ch1, cen, id, bead_radius, do_normalization)
+    normalization = if do_normalization then
+                      auto_00 = compute_single_bead_correlation(mask, im, ch0, ch0, cen, id, bead_radius, false)[:norm_corr]
+                      auto_11 = compute_single_bead_correlation(mask, im, ch1, ch1, cen, id, bead_radius, false)[:norm_corr]
+                      Math.sqrt(auto_00 * auto_11)*(auto_00.abs/auto_00)
+                    else
+                      1
+                    end
+
+    box_lower = ImageCoordinate[cen[0] - bead_radius - 1, cen[1] - bead_radius - 1,0,0,0]
+    box_upper = ImageCoordinate[cen[0] + bead_radius + 2, cen[1] + bead_radius + 2,1,1,1]
+    mask.setBoxOfInterest(box_lower, box_upper)
+    
+    ch_coord = ImageCoordinate[0,0,0,0,0]
+    corr_sum = 0
+    bg_sum = 0
+    count = 0
+    bg_count = 0
+
+    mask.each do |ic|
+      next unless mask[ic] == id
+      ch_coord.setCoord(ic)
+      ch_coord[:c] = ch0
+      val = im[ch_coord]
+      ch_coord[:c] = ch1
+      corr_sum += val * im[ch_coord]
+      count += 1
+      mirror_coord!(ch_coord, cen[0], cen[1])
+      if im.inBounds(ch_coord) then
+        bg_sum += val * im[ch_coord]
+        bg_count += 1
+      end
+    end
+      
+    mask.clearBoxOfInterest
+    box_lower.recycle
+    box_upper.recycle
+    ch_coord.recycle
+
+    {norm_corr: (corr_sum/count - bg_sum/bg_count)/normalization , corr: corr_sum/count, bg_corr: bg_sum/bg_count}
+
+  end
+
+  ##
+  # Runs a correlation analysis between two channels of the image.  This is done by directly
+  # computing the correlation for each bead and then computing an effective background by
+  # swapping the x- and y- axes of one channel within each bead.
+  #
+  # @param [Image] mask the mask of the beads
+  # @param [Integer] ch0 the first channel for the correlation
+  # @param [Integer] ch1 the second channel for the correlation
+  # @param [Hash] cens a hash mapping bead labels in the mask to the centroids of the beads
+  # @param [Hash] opts the options hash
+  #
+  # @return [Hash] a hash mapping :norm_corr, :corr, and :bg_corr to a hash mapping bead labels to their measurements
+  #
+  def self.compute_correlation(mask, im, ch0, ch1, cens, opts)
+    result = {norm_corr: {}, corr: {}, bg_corr: {}}
+    cens.each do |id, cen|
+      corr_for_bead = compute_single_bead_correlation(mask, im, ch0, ch1, cen, id, opts[:beadradius], true)
+      result[:norm_corr][id] = corr_for_bead[:norm_corr]
+      result[:corr][id] = corr_for_bead[:corr]
+      result[:bg_corr][id] = corr_for_bead[:bg_corr]
+    end
+    result
+  end
+
 
   ##
   # Writes the output data and mask to files.
@@ -340,6 +465,26 @@ module FindBeads
   end
 
   ##
+  # Organizes the correlation data into a csv string where each row is a bead and each column is a measurement.
+  # Also creates a header row.
+  #
+  # @param [Hash] corr_output a hash formatted like the output of FindBeads.compute_correlation
+  # 
+  # @return [String] a string containing the same data in csv format.
+  #
+  def self.format_correlation_output(corr_output)
+    header_row = ["bead index", "normalized, corrected correlation", "correlation", "background correlation"]
+    
+    CSV.generate do |csv|
+      csv << header_row
+      
+      corr_output[:corr].each_key do |id|
+        csv << [id, corr_output[:norm_corr][id], corr_output[:corr][id], corr_output[:bg_corr][id]]
+      end
+    end
+  end
+
+  ##
   # Processes a single file, which consists of creating a mask, quantifying regions, and writing output.
   #
   # @param [String] fn the filename of the image to process
@@ -348,8 +493,14 @@ module FindBeads
   def self.process_file(fn, opts=nil)
     puts "processing #{fn}"
 
+    cens = if opts and opts[:correlation_channels] then
+             OpenStruct.new
+           else
+             nil
+           end
+
     im = RImageAnalysisTools.get_image(fn)
-    mask = mask_from_image(im, opts)
+    mask = mask_from_image(im, opts, cens)
     proj = Java::edu.stanford.cfuller.imageanalysistools.frontend.MaximumIntensityProjection.projectImage(im)
     ims = proj.splitChannels
     is = ImageSet.new(ParameterDictionary.emptyDictionary)
@@ -358,9 +509,15 @@ module FindBeads
       is.addImageWithImage(imc)
     end
 
-    met = IntensityPerPixelMetric.new
-    q = met.quantify(mask, is)
-    outdat = Java::edu.stanford.cfuller.imageanalysistools.frontend.LocalAnalysis.generateDataOutputString(q, nil)
+    outdat = if opts and opts[:correlation_channels] then
+               q = compute_correlation(mask, proj, opts[:correlation_channels][0], opts[:correlation_channels][1], cens.centroids, opts)
+               format_correlation_output(q)
+             else
+               met = IntensityPerPixelMetric.new
+               q = met.quantify(mask, is)
+               Java::edu.stanford.cfuller.imageanalysistools.frontend.LocalAnalysis.generateDataOutputString(q, nil)
+             end
+
     write_output(fn, outdat, mask)
   end
 
@@ -375,6 +532,11 @@ module FindBeads
       opt :segplane, "Plane on which to segment (0-indexed)", :type => :integer, :default => DEFAULT_SEG_PL
       opt :max_threads, "Maximum number of paralell execution threads", :type => :integer, :default => DEFAULT_THREADS
       opt :beadradius, "Radius of the bead in pixels", :type => :float, :default => DEFAULT_BEAD_RADIUS
+      opt :correlation_channels, "Runs correlation between the specified two comma separated channels", :type => :string, :default => nil
+    end
+
+    if opts[:correlation_channels] then
+      opts[:correlation_channels] = opts[:correlation_channels].gsub("\s+", "").split(",").map(&:to_i)
     end
 
     if opts[:dir] then
