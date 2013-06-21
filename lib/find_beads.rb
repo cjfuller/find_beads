@@ -372,7 +372,11 @@ module FindBeads
     normalization = if do_normalization then
                       auto_00 = compute_single_bead_correlation(mask, im, ch0, ch0, cen, id, bead_radius, false)[:norm_corr]
                       auto_11 = compute_single_bead_correlation(mask, im, ch1, ch1, cen, id, bead_radius, false)[:norm_corr]
-                      Math.sqrt(auto_00 * auto_11)*(auto_00.abs/auto_00)
+                      begin
+                        Math.sqrt(auto_00 * auto_11)*(auto_00.abs/auto_00)
+                      rescue Math::DomainError
+                        Float::NAN
+                      end
                     else
                       1
                     end
