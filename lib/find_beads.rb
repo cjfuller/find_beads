@@ -519,7 +519,7 @@ module FindBeads
              else
                met = IntensityPerPixelMetric.new
                q = met.quantify(mask, is)
-               Java::edu.stanford.cfuller.imageanalysistools.frontend.LocalAnalysis.generateDataOutputString(q, nil)
+               Java::edu.stanford.cfuller.imageanalysistools.frontend.LocalAnalysis.generateDataOutputString(q, nil).strip.gsub(" ", ",")
              end
 
     write_output(fn, outdat, mask)
