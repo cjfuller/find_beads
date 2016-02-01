@@ -6,21 +6,23 @@ Script to segment and quantify beads in microscopy images.
 
 #Installation
 
-gem install find_beads
+You'll need java; this has only been tested on Java 8.
+
+Download the executable jar file here: https://storage.googleapis.com/find-beads-dist/find-beads-1.0
+
+On OSX / linux, you can run `chmod u+x find-beads-1.0` to run it as if it's an executable itself.
 
 #Running
+`find-beads-1.0 --help`
+or
+`java -jar find-beads-1.0 --help`
 
-To list command line options for processing:
+for usage instructions.
 
-find_beads --help
+#Building from source
+You'll need Scala (tested only with 2.11) and sbt.
 
-To run:
-
-find_beads [args]
-
-#Documentation
-
-API documentation is available [here](http://rubydoc.info/gems/find_beads).
+`sbt assembly` will build an executable jar with all dependencies.
 
 #License
 
